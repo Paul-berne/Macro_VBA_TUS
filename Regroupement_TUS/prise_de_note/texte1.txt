@@ -1,0 +1,334 @@
+copy_paste data (Ws_new as worksheet, start_row, consigne, tolerance, Ws_paste as worksheet,group_1 boolean ) return integer
+calcul last_row
+'première fois d'appel -> le start_row correspond au nombre de ligne de l'entete
+boucle for avec i = start_row + 1 jusqu'a la dernière ligne
+	si y'a date sur colonne A et que y'a vide sur colonne B et que y'a nombre sur colone C on est bon
+
+calcul last_column
+ensuite on pars de last_row pour parcourir a l'envers les données et si de la colonne C a last_column la moyenne est dans consigne + ou - tolerance on récupère la ligne dans la ligne last_row
+
+on copie de C & Start_row jusqu'a Last_Column & last_row -> Ws_new vers Ws_paste
+
+on copie les dates/heures -> Ws_new vers Ws_paste
+
+copy_data_paste = last_row
+
+
+Sub Realisation_TUS_DOVER()
+
+    Dim wb As Workbook: Set wb = ThisWorkbook
+    Dim Ws_Mesures As Worksheet: Set Ws_Mesures = wb.Worksheets("Mesures_Dover")
+    Dim Ws_Valeurs_Brutes_1 As Worksheet: Set Ws_Valeurs_Brutes_1 = wb.Worksheets("Donnee_Dover_1")
+    Dim Ws_recap_1 As Worksheet: Set Ws_recap_1 = wb.Worksheets("Dover_1")
+    Dim Ws_Valeurs_Brutes_2 As Worksheet: Set Ws_Valeurs_Brutes_2 = wb.Worksheets("Donnee_Dover_2")
+    Dim Ws_recap_2 As Worksheet: Set Ws_recap_2 = wb.Worksheets("Dover_2")
+    Dim Ws_Valeurs_Brutes_3 As Worksheet: Set Ws_Valeurs_Brutes_3 = wb.Worksheets("Donnee_Dover_3")
+    Dim Ws_recap_3 As Worksheet: Set Ws_recap_3 = wb.Worksheets("Dover_3")
+    
+    Dim Ws_Group_1_paste As Worksheet: Set Ws_Group_1_paste = wb.Worksheets("Group-1")
+    Dim Ws_Entete As Worksheet: Set Ws_Entete = wb.Worksheets("Entete")
+    
+    Dim path_to_csv As String
+    
+'    If Verif_before(Ws_Mesures) = False Then
+'        MsgBox ("Il y a des champs qui ne sont pas remplis, veuillez compléter les cellules entièrement.")
+'        Exit Sub
+'    End If
+'
+'    Do While path_to_csv = "" Or InStr(1, path_to_csv, "Group-1~") = 0
+'        path_to_csv = ouvrirFichier("Groupe 1")
+'
+'        If InStr(1, path_to_csv, "Group-1~") = 0 Then
+'            path_to_csv = ""
+'            If MsgBox("Vous avez choisi le mauvais fichier. Veuillez recommencer.", vbOKCancel) = vbCancel Then
+'                Exit Sub
+'            End If
+'        Else
+'            Exit Do
+'        End If
+'    Loop
+
+    path_to_csv = "C:\Users\pberne\Desktop\projet_git\Macro_VBA_TUS\Étuve_DOVER\data\Group-1~.csv"
+    Workbooks.OpenText Filename:=path_to_csv, local:=True
+    
+    Dim wb_Group_1 As Workbook: Set wb_Group_1 = ActiveWorkbook
+    Dim Ws_Group_1 As Worksheet: Set Ws_Group_1 = wb_Group_1.Worksheets(1)
+    
+    Clear_Content_Valeurs_Brutes Ws_Valeurs_Brutes_1, False
+    Clear_Content_Valeurs_Brutes Ws_Valeurs_Brutes_2, False
+    Clear_Content_Valeurs_Brutes Ws_Valeurs_Brutes_3, False
+    Clear_Content_Recap Ws_recap_1
+    Clear_Content_Recap Ws_recap_1
+    Clear_Content_Recap Ws_recap_1
+    
+    Clear_Content_Valeurs_Brutes Ws_Group_1_paste, True
+    
+    Dim tolerance As Integer: tolerance = Ws_Mesures.Range("B20").Value
+    Dim consigne_1 As Integer, consigne_2 As Integer, consigne_3 As Integer
+    
+    consigne_1 = Ws_Mesures.Range("B19").Value
+    consigne_2 = Ws_Mesures.Range("C19").Value
+    consigne_3 = Ws_Mesures.Range("D19").Value
+    
+    If VerifEntete(Ws_Group_1, "Entete_DOVER") Then
+        Dim Start_Row As Long: Start_Row = Ws_Entete.Range("Entete_DOVER").Rows.Count
+        Start_Row = Copy_Data_Paste(Ws_Group_1, Start_Row, consigne_1, tolerance, Ws_recap_1, True)
+        Start_Row = Copy_Data_Paste(Ws_Group_1, Start_Row, consigne_2, tolerance, Ws_recap_2, False)
+        Start_Row = Copy_Data_Paste(Ws_Group_1, Start_Row, consigne_3, tolerance, Ws_recap_3, False)
+        
+        MT1_MT2_delimitation Ws_Valeurs_Brutes_1, Ws_recap_1
+        MT1_MT2_delimitation Ws_Valeurs_Brutes_2, Ws_recap_2
+        MT1_MT2_delimitation Ws_Valeurs_Brutes_3, Ws_recap_3
+        
+    Else
+        MsgBox "Les en-têtes ne correspondent pas, veuillez vérifier la correspondance dans la feuille Entete (Masquée)."
+    End If
+    wb_Group_1.Close
+End Sub
+
+
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+
+
+'Fonction qui vérifie que les entêtes du fichier group-1 que l'utilisateur fournis correspond aux entetes dans la feuille "Entete" masquée, avec comme nom de cellule -> Nom_Entete
+Public Function VerifEntete(Ws_New As Worksheet, Nom_Entete As String) As Boolean
+    Dim c As Range
+    Dim Ws_this As Worksheet: Set Ws_this = ThisWorkbook.Worksheets("Entete")
+    Dim Entete_this As Range: Set Entete_this = Ws_this.Range(Nom_Entete)
+    Dim l_Lc As Long: l_Lc = Entete_this.Columns(Entete_this.Columns.Count).Column
+
+    
+    Dim Row As Integer: Row = 1
+    Dim Column As Integer: Column = 1
+
+    For Each c In Entete_this
+        
+        If c.Value = Ws_New.Cells(Row, Column).Value Then
+            VerifEntete = True
+        Else
+            VerifEntete = False
+            Exit For
+        End If
+        If c.Column = l_Lc Then
+            Row = Row + 1
+            Column = 1
+        Else
+            Column = Column + 1
+        End If
+    Next c
+    
+End Function
+'Fonction pour proposé un explorateur de fichier a l'utilisateur pour qu'il choisisse le fichier group-1
+Public Function ouvrirFichier(s_type As String) As String
+    Dim fd As Office.FileDialog
+    Dim strFile As String
+    Set fd = Application.FileDialog(msoFileDialogFilePicker)
+    
+    With fd
+        .Filters.Clear
+        .Filters.Add "Excel Files", "*.csv", 1
+        .Title = "Sélectionner le fichier de données : " & s_type
+        .AllowMultiSelect = False
+        .InitialFileName = ThisWorkbook.Path
+        If .Show = True Then
+            ouvrirFichier = .SelectedItems(1)
+        End If
+    End With
+End Function
+'Fonction Utilisée pour les TUS avec 1 consigne, qui permet de délimiter les zone de temps de maitien et de montée, temps de maintien = les 30 dernières données
+Public Sub MT1_MT2_delimitation(Ws_Valeurs_Brutes As Worksheet, Ws_Recap As Worksheet)
+    Dim l_LR_VB As Long: l_LR_VB = Ws_Valeurs_Brutes.Cells(Rows.Count, 1).End(xlUp).Row 'VB = Valeur Brutes
+    Dim l_Lc As Long: l_Lc = Ws_Valeurs_Brutes.Cells(1, Columns.Count).End(xlToLeft).Column 'LR = Lastcolumn
+    
+    While IsError(Ws_Recap.Range("test_propagation")): Ws_Recap.Cells(Ws_Recap.Range("MT2_30").Row, 1).EntireRow.Insert: Wend
+
+    'Coloration et fusion pour recréer MT1 et MT2 propre
+    Ws_Recap.Range(Ws_Recap.Range("MT2_30"), Ws_Recap.Range("MT2_30").Offset(-30, l_Lc)).Interior.Color = 15986394
+    Ws_Recap.Range(Ws_Recap.Range("MT2_30"), Ws_Recap.Range("MT2_30").Offset(-30)).Merge
+    Ws_Recap.Range(Ws_Recap.Range("MT1_30"), Ws_Recap.Range("MT2_30").Offset(-1)).Merge
+End Sub
+'Fonction qui permet de vérifier que les cases qui sont nécessaire au bon fonctionnement de la TUS soit rempli, sur la feuille Mesure il y'a une vérification qui modifie la couleur d'une
+'Cellule en fonction de si elle n'est pas protégée et vide
+Public Function Verif_before(Ws_mesure As Worksheet) As Boolean
+    
+Dim c As Range
+Verif_before = True
+For Each c In Ws_mesure.UsedRange
+    If c.DisplayFormat.Interior.Color = 6723891 Then
+        Verif_before = False
+        Exit Function
+    End If
+Next c
+End Function
+
+Public Function Copy_Data_Paste(Ws_New As Worksheet, ByVal Start_Row As Integer, consigne As Integer, tolerance As Integer, Ws_paste As Worksheet, group_1 As Boolean) As Integer
+    Dim l_Lr As Long: l_Lr = Ws_New.Cells(Rows.Count, 1).End(xlUp).Row 'LR = LastRow
+    Dim cellule_ok As Double
+    Dim Consigne_Tolerance_plus As Integer: Consigne_Tolerance_plus = consigne + tolerance
+    Dim Consigne_Tolerance_moins As Integer: Consigne_Tolerance_moins = consigne - tolerance
+
+    For i = Start_Row + 1 To l_Lr
+        If Ws_New.Cells(i, 2) = "" And IsDate(Ws_New.Cells(i, 1)) And IsNumeric(Ws_New.Cells(i, 3)) Then
+            Start_Row = i 'Start_row
+            Exit For
+        End If
+    Next i
+    
+    'Récupération et transformation de la dernière colonne en lettre
+    Dim l_Lc As Long: l_Lc = Ws_New.Cells(Start_Row, Columns.Count).End(xlToLeft).Column 'LR = Lastcolumn
+    For i = l_Lc To 0 Step -1
+        If IsNumeric(Ws_New.Cells(Start_Row, i).Value) Then
+            l_Lc = i
+            Exit For
+        End If
+    Next i
+    
+    Convert_Column = Split(Cells(1, l_Lc).Address(True, False), "$")
+    Col_Letter = Convert_Column(0)
+    
+    Convert_Column_Paste = Split(Cells(1, l_Lc - 1).Address(True, False), "$")
+    Col_Letter_Paste = Convert_Column_Paste(0)
+    
+    If group_1 Then
+        ThisWorkbook.Worksheets("Group-1").Range("A1:" & Col_Letter & l_Lr - Start_Row).Value = Ws_New.Range("A" & Start_Row & ":" & Col_Letter & l_Lr).Value
+    End If
+
+    For i = l_Lr To Start_Row Step -1
+        cellule_ok = Application.WorksheetFunction.Average(Ws_New.Range("C" & i & ":" & Col_Letter & i))
+        If cellule_ok <= Consigne_Tolerance_plus And cellule_ok >= Consigne_Tolerance_moins Then
+            Ws_paste.Range("B2:" & Col_Letter_Paste & i + 1 - Start_Row).Value = Ws_New.Range("C" & Start_Row & ":" & Col_Letter & i).Value
+            Ws_paste.Range("A2:A" & i + 1 - Start_Row).Value = Ws_New.Range("A" & Start_Row & ":A" & i).Value
+            Copy_Data_Paste = i
+            Exit For
+        End If
+    Next i
+
+End Function
+
+'Fonction qui permet de supprimer toutes les données de la feuille valeurs brutes en laissant les entêtes et une ligne vide en-dessous appartenant au tableau
+Public Sub Clear_Content_Valeurs_Brutes(Ws_Valeurs_Brutes As Worksheet, Clear_Group_1 As Boolean)
+    Dim LR_Valeurs_Brutes As Long: LR_Valeurs_Brutes = Ws_Valeurs_Brutes.Cells(Rows.Count, 1).End(xlUp).Row 'LR = LastRow
+    If Clear_Group_1 Then
+        For i = LR_Valeurs_Brutes To 1 Step -1
+            Ws_Valeurs_Brutes.Rows(i).ClearContents
+        Next i
+    Else
+        If LR_Valeurs_Brutes > 3 Then
+            Ws_Valeurs_Brutes.Range("A" & 3 & ":A" & LR_Valeurs_Brutes).EntireRow.Delete
+        End If
+        Ws_Valeurs_Brutes.Cells(2, 1).EntireRow.Clear
+    End If
+End Sub
+'Fonction pour les TUS a 1 consigne qui permet de redélimité par défaut les zone de temps de montée et temps de maintien, pour n'avoir que une ligne pour chaque temps vide
+Public Sub Clear_Content_Recap(Ws_New As Worksheet)
+
+    If Ws_New.Range("MT1_30").MergeCells And Ws_New.Range("MT2_30").MergeCells Then
+        Ws_New.Range(Ws_New.Range("MT1_30"), Ws_New.Range("MT1_30").Offset(-1)).UnMerge
+        Ws_New.Range(Ws_New.Range("MT2_30"), Ws_New.Range("MT2_30").Offset(-29)).UnMerge
+        Ws_New.Range(Ws_New.Range("MT1_30").Offset(1), Ws_New.Range("MT2_30").Offset(-1)).EntireRow.Delete
+        Ws_New.Range(Ws_New.Range("MT2_30").Offset(1), Ws_New.Range("MT2_30").Offset(30)).EntireRow.Delete
+    End If
+End Sub
+'Fonction qui comme le nom l'indique permet de clear toutes les données informées dans toutes les TUS, pour remettre par défaut le fichier
+Sub clear_all_content()
+    
+    Dim c As Range
+    Dim wb As Workbook: Set wb = ThisWorkbook
+    Dim Ws_Mesures As Worksheet
+    Dim ws As Worksheet
+    
+    wb.unprotect "servicequalite"
+    
+    For Each ws In wb.Worksheets
+        If ws.ProtectContents = False Then
+            ws.protect "servicequalite", UserInterfaceOnly:=True, AllowFiltering:=True
+        End If
+    Next ws
+    
+    'Clear Congel
+    Dim Ws_Valeurs_Brutes As Worksheet: Set Ws_Valeurs_Brutes = wb.Worksheets("Donnee_Congel_-30")
+    Dim Ws_Recap As Worksheet: Set Ws_Recap = ThisWorkbook.Worksheets("Congel_-30°C")
+    Clear_Content_Recap Ws_Recap
+    Clear_Content_Valeurs_Brutes Ws_Valeurs_Brutes, False
+    
+    Set Ws_Mesures = wb.Worksheets("Mesures_Congel")
+    For Each c In Ws_Mesures.UsedRange
+        If c.Interior.Color = 11854022 Then
+            c.ClearContents
+        End If
+    Next c
+    
+    'Clear Sechoir
+    Dim Ws_Valeurs_Brutes_Sechoir As Worksheet: Set Ws_Valeurs_Brutes_Sechoir = wb.Worksheets("Donnee_Sechoir_50")
+    Dim Ws_Recap_Sechoir As Worksheet: Set Ws_Recap_Sechoir = ThisWorkbook.Worksheets("Sechoir_50°C")
+    Clear_Content_Recap Ws_Recap_Sechoir
+    Clear_Content_Valeurs_Brutes Ws_Valeurs_Brutes_Sechoir, False
+    
+    Set Ws_Mesures = wb.Worksheets("Mesures_Sechoir")
+    For Each c In Ws_Mesures.UsedRange
+        If c.Interior.Color = 11854022 Then
+            c.ClearContents
+        End If
+    Next c
+    
+    'Clear Dover
+    Dim Ws_Entete As Worksheet: Set Ws_Entete = wb.Worksheets("Entete")
+    Dim Ws_Donnee_50_dover As Worksheet: Set Ws_Donnee_50_dover = wb.Worksheets("Donnee_Dover_50")
+    Dim Ws_Donnee_100_dover As Worksheet: Set Ws_Donnee_100_dover = wb.Worksheets("Donnee_Dover_100")
+    Dim Ws_Donnee_150_dover As Worksheet: Set Ws_Donnee_150_dover = wb.Worksheets("Donnee_Dover_150")
+
+    Clear_Content_Valeurs_Brutes Ws_Donnee_50_dover, False
+    Clear_Content_Valeurs_Brutes Ws_Donnee_100_dover, False
+    Clear_Content_Valeurs_Brutes Ws_Donnee_150_dover, False
+    
+    Set Ws_Mesures = wb.Worksheets("Mesures_Dover")
+    For Each c In Ws_Mesures.UsedRange
+        If c.Interior.Color = 11854022 Then
+            c.ClearContents
+        End If
+    Next c
+    
+    Dim Ws_Group_1 As Worksheet: Set Ws_Group_1 = wb.Worksheets("Group-1") 'Feuille Group-1 qui contient toutes les données du group-1 pour faire un graphique a courbe dans le ThisWorkbook
+    Clear_Content_Valeurs_Brutes Ws_Group_1, True
+    
+    Dim Ws_Donnee_60 As Worksheet: Set Ws_Donnee_60 = wb.Worksheets("Donnee_Omia_60")
+    Dim Ws_Donnee_150 As Worksheet: Set Ws_Donnee_150 = wb.Worksheets("Donnee_Omia_150")
+    Dim Ws_Donnee_190 As Worksheet: Set Ws_Donnee_190 = wb.Worksheets("Donnee_Omia_190")
+    
+    Clear_Content_Valeurs_Brutes Ws_Donnee_60, False
+    Clear_Content_Valeurs_Brutes Ws_Donnee_150, False
+    Clear_Content_Valeurs_Brutes Ws_Donnee_190, False
+    
+    Set Ws_Mesures = wb.Worksheets("Mesures_Omia")
+    For Each c In Ws_Mesures.UsedRange
+        If c.Interior.Color = 11854022 Then
+            c.ClearContents
+        End If
+    Next c
+    
+    wb.protect "servicequalite"
+
+End Sub
+'Fonction peu utilisée, qui a pour but comme le nom l'indique d'enlever la protection de toutes les feuilles ainsi que le classeur
+Sub unprotect()
+
+Dim ws As Worksheet
+
+For Each ws In ThisWorkbook.Worksheets
+ ws.unprotect "servicequalite"
+ Next ws
+ ThisWorkbook.unprotect "servicequalite"
+End Sub
+
+'Fonction peu utilisée, qui a pour but comme le nom l'indique de mettre la protection de toutes les feuilles ainsi que le classeur
+Sub protection()
+
+Dim ws As Worksheet
+
+For Each ws In ThisWorkbook.Worksheets
+ ws.protect "servicequalite", UserInterfaceOnly:=True
+ Next ws
+ ThisWorkbook.protect "servicequalite"
+End Sub
+
+
